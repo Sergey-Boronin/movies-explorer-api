@@ -1,4 +1,6 @@
 # movies-explorer-api
 
-### url - api.boronin.nomoredomains.club
-### ip - 178.154.253.235
+#### Домен
+[https://api.kuznetsova.movies.nomoredomains.icu/]
+
+#### Публичный IP - 84.252.132.80
