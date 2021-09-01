@@ -1,11 +1,96 @@
-const router = require('express').Router();
-const {
-  getMovies, createMovie, deleteMovie,
-} = require('../controllers/movies');
-const { movieValidation, idValidation } = require('../middlewares/validationCheck');
 
-router.get('/', getMovies);
-router.post('/', movieValidation, createMovie);
-router.delete('/:id', idValidation, deleteMovie);
+const router = require("express").Router();
+const { celebrate, Joi } = require("celebrate");
+const validator = require("validator");
+const { ObjectId } = require('mongoose').Types;
+
+const {
+  getMovies,
+  deleteMovie,
+  createMovies,
+} = require("../controllers/movies");
+
+
+router.get(
+  "/movies",
+  celebrate({
+    headers: Joi.object()
+      .keys({
+        authorization: Joi.string().required(),
+      })
+      .unknown(),
+  }),
+  getMovies
+);
+
+router.post(
+  "/movies",
+  celebrate({
+    headers: Joi.object()
+      .keys({
+        authorization: Joi.string().required(),
+      })
+      .unknown(),
+    body: Joi.object().keys({
+      country: Joi.string().required(),
+      director: Joi.string().required(),
+      duration: Joi.number().required(),
+      year: Joi.string().required(),
+      description: Joi.string().required(),
+      image: Joi.string()
+        .required()
+        .custom((value, helpers) => {
+          if (validator.isURL(value)) {
+            return value;
+          }
+          return helpers.message('Поле "изображение" заполнено некорректно');
+        }),
+      trailer: Joi.string()
+        .required()
+        .custom((value, helpers) => {
+          if (validator.isURL(value)) {
+            return value;
+          }
+          return helpers.message('Поле "трейлер" заполнено некорректно');
+        }),
+      thumbnail: Joi.string()
+        .required()
+        .custom((value, helpers) => {
+          if (validator.isURL(value)) {
+            return value;
+          }
+          return helpers.message('Поле "миниатюра" заполнено некорректно');
+        }),
+      movieId: Joi.number().required(),
+      nameRU: Joi.string().required(),
+      nameEN: Joi.string().required(),
+    }),
+  }),
+  createMovies
+);
+
+router.delete(
+  "/movies/:movieId",
+  celebrate({
+    headers: Joi.object()
+      .keys({
+        authorization: Joi.string().required(),
+      })
+      .unknown(),
+
+    params: Joi.object().keys({
+      movieId: Joi.string()
+        .required()
+        .custom((value) => {
+          if (!ObjectId.isValid(value)) {
+            throw new Error("Ошибка валидации. Передан неправильный Id");
+          }
+          return value;
+        }),
+    }),
+  }),
+  deleteMovie
+);
+
 
 module.exports = router;
