@@ -1,29 +1,44 @@
 const router = require('express').Router();
-const { celebrate, Joi } = require('celebrate');
-const userRouter = require('./users');
-const movieRouter = require('./movies');
-const auth = require('../middlewares/auth');
+
+const usersRouter = require('./users');
+const moviesRouter = require('./movies');
+
 const { createUser, login } = require('../controllers/users');
+const auth = require('../middlewares/auth');
 
-const validateUserSignup = celebrate({
-  body: Joi.object().keys({
-    email: Joi.string().required().email(),
-    password: Joi.string().required().min(8),
-    name: Joi.string().min(2).max(30),
-  }),
+const NotFoundError = require('../errors/NotFoundError');
+
+const { CRASH_TEST_MSG, NOT_FOUND_ERROR_MSG } = require('../utils/constants');
+
+const {
+  registrValidation,
+  loginValidation,
+} = require('../middlewares/validationCheck');
+
+router.get('/crash-test', () => {
+  setTimeout(() => {
+    throw new Error(CRASH_TEST_MSG);
+  }, 0);
 });
 
-const validateSignin = celebrate({
-  body: Joi.object().keys({
-    email: Joi.string().required().email(),
-    password: Joi.string().required().min(8),
-  }),
+router.post('/signup', registrValidation, createUser);
+
+router.all('/signup', () => {
+  throw new NotFoundError(`${NOT_FOUND_ERROR_MSG}`);
 });
 
-router.post('/signup', validateUserSignup, createUser);
-router.post('/signin', validateSignin, login);
+router.post('/signin', loginValidation, login);
 
-router.use('/users', auth, userRouter);
-router.use('/movies', auth, movieRouter);
+router.all('/signin', () => {
+  throw new NotFoundError(`${NOT_FOUND_ERROR_MSG}`);
+});
+
+router.use(auth);
+
+router.use('/users', usersRouter);
+router.use('/movies', moviesRouter);
+router.all('*', () => {
+  throw new NotFoundError(`${NOT_FOUND_ERROR_MSG}`);
+});
 
 module.exports = router;
