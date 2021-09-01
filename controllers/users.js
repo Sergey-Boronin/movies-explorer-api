@@ -1,103 +1,110 @@
+const { NODE_ENV, JWT_SECRET_KEY } = process.env;
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const NotFoundError = require('../errors/not-found-error');
-const BadRequestError = require('../errors/bad-request-error');
-const ConflictError = require('../errors/conflict-error');
+const AuthError = require('../errors/401-authError');
+const ValidationError = require('../errors/400-validationError');
+const NotFoundError = require('../errors/404-notFoundError');
+const ConflictError = require('../errors/409-conflictError');
 
-const { NODE_ENV, JWT_SECRET } = process.env;
+const createUser = (req, res, next) => {
+  const {
+    email, password, name,
+  } = req.body;
+  User.findOne({ email })
+    .then((user) => {
+      if (user) {
+        throw new ConflictError('Такой email уже есть в базе');
+      }
+      bcrypt
+        .hash(password, 10)
+        .then((hash) => User.create({
+          email,
+          password: hash,
+          name,
+        }))
+        .catch((err) => {
+          if (err.name === 'ValidationError') {
+            throw new ValidationError('Переданы некорректные данные');
+          }
+          return next(err);
+        })
+        .then(() => {
+          res.status(200).send({ message: 'Пользователь успешно зарегистрирован' });
+        })
+        .catch(next);
+    })
+    .catch(next);
+};
 
-// ПОЛУЧИТЬ ТЕКУЩЕГО ПОЛЬЗОВАТЕЛЯ
-const getCurrentUser = (req, res, next) => {
-  const myId = req.user._id;
-  User.findById(myId)
+const loginUser = (req, res, next) => {
+  const { email, password } = req.body;
+  User.findOne({ email }).select('+password')
+    .then((user) => {
+      if (!user) {
+        throw new AuthError('Требуется авторизация! Введите корректные email и пароль');
+      }
+      return bcrypt.compare(password, user.password)
+        .then((matched) => {
+          if (!matched) {
+            throw new AuthError('Требуется авторизация! Введите корректные email и пароль');
+          }
+          return user;
+        });
+    })
+    .then((user) => {
+      const token = jwt.sign(
+        { _id: user._id },
+        NODE_ENV === 'production' ? JWT_SECRET_KEY : 'dev-secret',
+        { expiresIn: '7d' },
+      );
+      res.send({ token });
+    })
+    .catch(next);
+};
+
+const getMyProfile = (req, res, next) => {
+  User.findById(req.user._id)
+    .catch((err) => {
+      if (err.kind === 'ObjectId') {
+        throw new ValidationError('Некорректный id пользователя');
+      }
+      return next(err);
+    })
     .then((user) => {
       if (!user) {
         throw new NotFoundError('Пользователь не найден');
       }
-      return res.send(user);
+      res.status(200).send({ data: user });
     })
-    .catch((err) => {
-      if (err.kind === 'ObjectId') {
-        next(new BadRequestError('Невалидный id пользователя'));
-      } else {
-        next(err);
-      }
-    });
+    .catch((err) => next(err));
 };
 
-// ОБНОВИТЬ ИНФОРМАЦИЮ О ПОЛЬЗОВАТЕЛЕ
-const updateUserInfo = (req, res, next) => {
+const updateProfile = (req, res, next) => {
   const { email, name } = req.body;
   User.findByIdAndUpdate(
     req.user._id,
     { email, name },
     { new: true, runValidators: true },
   )
+    .catch((err) => {
+      if (err.name === 'ValidationError') {
+        throw new ValidationError('Переданы некорректные данные');
+      }
+      return next(err);
+    })
     .then((user) => {
       if (!user) {
         throw new NotFoundError('Пользователь не найден');
       }
-      return res.send(user);
+      res.status(200).send({ data: user });
     })
-    .catch((err) => {
-      if (err.name === 'ValidationError' || err.kind === 'ObjectId') {
-        next(new BadRequestError('Переданы некорректные данные'));
-      } else if (err.name === 'MongoError' || err.code === '11000') {
-        next(new ConflictError('Можно вносить изменения только со своего email'));
-      } else {
-        next(err);
-      }
-    });
-};
-
-// СОЗДАТЬ ПОЛЬЗОВАТЕЛЯ
-const createUser = (req, res, next) => {
-  const { email, password, name } = req.body;
-
-  if (password.length === 0) {
-    throw new BadRequestError('Введите пароль');
-  }
-
-  bcrypt.hash(password, 10)
-    .then((hash) => User.create({
-      email, password: hash, name,
-    }))
-    .then((user) => {
-      res.status(201).send({ user: user.toJSON() });
-    })
-    .catch((err) => {
-      if (err.name === 'MongoError' && err.code === 11000) {
-        next(new ConflictError('Пользователь с данным e-mail уже существует'));
-      } else if (err.name === 'ValidationError') {
-        next(new BadRequestError('Передан неверный формат данных'));
-      } else {
-        next(err);
-      }
-    });
-};
-
-// ЛОГИН
-const login = (req, res, next) => {
-  const { email, password } = req.body;
-
-  return User.findUserByCredentials(email, password)
-    .then((user) => {
-      const token = jwt.sign(
-        { _id: user._id },
-        NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret',
-        { expiresIn: '7d' },
-      );
-      res.send({ token });
-    })
-    .catch((err) => {
-      next(err);
-    });
+    .catch((err) => next(err));
 };
 
 module.exports = {
-  getCurrentUser,
-  updateUserInfo,
   createUser,
-  login,
+  loginUser,
+  getMyProfile,
+  updateProfile,
 };

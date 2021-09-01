@@ -1,6 +1,5 @@
 # movies-explorer-api
 
-#### Домен
-[https://api.kuznetsova.movies.nomoredomains.icu/]
+## Бэкенд дипломной работы на курсе Яндекс.Практикум.
 
-#### Публичный IP - 84.252.132.80
+### /

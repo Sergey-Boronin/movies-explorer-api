@@ -1,51 +1,44 @@
 require('dotenv').config();
-const cors = require('cors');
 const express = require('express');
-const mongoose = require('mongoose');
+const cors = require('cors');
 const helmet = require('helmet');
+const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const { errors } = require('celebrate');
-// const limiter = require('./config/rate-limiter');
-const { requestLogger, errorLogger } = require('./middlewares/logger');
-const router = require('./routes/index');
-const errorHandler = require('./middlewares/error-handler');
+const { limiter } = require('./utils/rateLimiter');
+const { apiLogger, errLogger } = require('./middlewares/logger');
+const routes = require('./routes/index');
+const serverError = require('./errors/500-serverError');
+const mongoDbLocal = require('./utils/config');
 
+const { PORT = 3001 } = process.env;
 const app = express();
-const { PORT = 3000 } = process.env;
-const { NODE_ENV, MONGO_URL } = process.env;
 
-mongoose.connect(NODE_ENV === 'production' ? MONGO_URL : 'mongodb://localhost:27017/bitfilmsdb', {
+const mongoDB = process.env.NODE_ENV === 'production' ? process.env.MONGO_URL : mongoDbLocal;
+mongoose.connect(mongoDB, {
   useNewUrlParser: true,
   useCreateIndex: true,
   useFindAndModify: false,
-  autoIndex: true,
-});
+  // eslint-disable-next-line no-console
+}).then(() => console.log('Congratulations!!!'));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-app.use(requestLogger);
-
+app.use(cookieParser());
+app.use(apiLogger);
+app.use(limiter);
 app.use(cors());
-
-// app.use(limiter);
-
 app.use(helmet());
 
-app.get('/crash-test', () => {
-  setTimeout(() => {
-    throw new Error('Сервер сейчас упадёт');
-  }, 0);
-});
 
-app.use(router);
+app.use('/', routes);
 
-app.use(errorLogger);
-
+app.use(errLogger);
 app.use(errors());
-
-app.use(errorHandler);
+app.use(serverError);
 
 app.listen(PORT, () => {
-  console.log(`App listening on port ${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`Movie-explorer project start on port ${PORT}`);
 });
