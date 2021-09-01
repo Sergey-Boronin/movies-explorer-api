@@ -1,50 +1,47 @@
-require('dotenv').config();
-
-const { NODE_ENV, MONGOURLPROD, MONGOURLDEV } = process.env;
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
 const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
 const { errors } = require('celebrate');
-const limiter = require('./middlewares/rate-limiter');
-const { errorHandler } = require('./middlewares/error-handler');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const cors = require('cors');
 const { requestLogger, errorLogger } = require('./middlewares/logger');
+const { limiterParams } = require('./utils/limiterParams');
+const routes = require('./routes/index');
 
-const router = require('./routes');
+const { DB_CONN = 'mongodb://localhost:27017/bitfilmsdb' } = process.env;
 
+// при работе на локальном сервере менять порт на 3005
 const { PORT = 3000 } = process.env;
-const { ORIGINS = 'http://localhost' } = process.env;
+
+const limiter = rateLimit(limiterParams);
 
 const app = express();
 
+app.use(cors());
 app.use(requestLogger);
-
 app.use(limiter);
-
-app.use(
-  cors({
-    origin: ORIGINS,
-    optionsSuccessStatus: 200,
-  }),
-);
-
 app.use(helmet());
 
-mongoose.connect(NODE_ENV === 'production' ? MONGOURLPROD : MONGOURLDEV, {
-  useNewUrlParser: true,
-  useCreateIndex: true,
-  useFindAndModify: false,
-  useUnifiedTopology: true,
-});
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use(express.json());
-
-app.use(router);
+app.use('/', routes);
 
 app.use(errorLogger);
 
 app.use(errors());
 
-app.use(errorHandler);
+app.use(require('./errors/CentralError'));
 
-app.listen(PORT);
+mongoose.connect(DB_CONN, {
+  useNewUrlParser: true,
+  useCreateIndex: true,
+  useFindAndModify: false,
+  useUnifiedTopology: true,
+  autoIndex: true,
+});
+
+app.listen(PORT, () => {
+  console.log(`App listening on port ${PORT}`);
+});

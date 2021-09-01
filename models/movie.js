@@ -24,20 +24,32 @@ const movieSchema = new mongoose.Schema({
   },
   image: {
     type: String,
+    required: true,
     validate: {
-      validator: (v) => validator.isURL(v),
+      validator(url) {
+        return validator.isURL(url);
+      },
+      message: 'Некорректный формат ссылки',
     },
   },
   trailer: {
     type: String,
+    required: true,
     validate: {
-      validator: (v) => validator.isURL(v),
+      validator(url) {
+        return validator.isURL(url);
+      },
+      message: 'Некорректный формат ссылки',
     },
   },
   thumbnail: {
     type: String,
+    required: true,
     validate: {
-      validator: (v) => validator.isURL(v),
+      validator(url) {
+        return validator.isURL(url);
+      },
+      message: 'Некорректный формат ссылки',
     },
   },
   owner: {
@@ -46,23 +58,17 @@ const movieSchema = new mongoose.Schema({
     required: true,
   },
   movieId: {
-    type: String,
-    require: true,
+    type: Number,
+    required: true,
   },
   nameRU: {
     type: String,
-    require: true,
+    required: true,
   },
   nameEN: {
     type: String,
-    require: true,
-  },
-  likes: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
-    default: [],
+    required: true,
   },
 });
-
-movieSchema.index({ owner: 1, movieId: 1 }, { unique: true });
 
 module.exports = mongoose.model('movie', movieSchema);
