@@ -1,57 +1,57 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const { errors } = require('celebrate');
 const helmet = require('helmet');
-const { requestLogger, errorLogger } = require('./middlewares/logger');
-const { BD_DEV_HOST } = require('./utils/config');
 const cors = require('cors');
-const userRouter = require('./routes/users');
-const moviesRouter = require('./routes/movies');
-const { authoriz } = require('./middlewares/auth');
-const signinUser = require('./routes/signin');
-const signupUser = require('./routes/signup');
-const { centralErrors } = require('./utils/centralErrors');
-const NotFoundError = require('./errors/NotFoundError');
+
+const { MONGO_DB_PATH, PORT } = require('./config');
+
+const { requestLogger, errorLogger } = require('./middlewares/logger');
+const limiter = require('./middlewares/limiter');
+const indexRouter = require('./routes/index');
+const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
 
-const { PORT = 3000, LINK, NODE_ENV } = process.env;
-
-// const corsOptions = {
-//   origin: ['*'],
-//   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-//   preflightContinue: false,
-//   optionsSuccessStatus: 204,
-//   allowedHeaders: ['Content-Type', 'origin', 'Authorization'],
-// };
-// app.use('*', cors(corsOptions));
-app.use(cors());
-app.use(helmet());
-
-mongoose.connect(NODE_ENV === 'production' ? LINK : BD_DEV_HOST, {
+mongoose.connect(MONGO_DB_PATH, {
   useNewUrlParser: true,
   useCreateIndex: true,
   useFindAndModify: false,
   useUnifiedTopology: true,
 });
 
-app.use(bodyParser.json());
 app.use(requestLogger);
+app.use(limiter);
+app.use(helmet());
+app.use(cors());
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.disable('x-powered-by');
+app.use(indexRouter);
 
-app.use('/', signinUser);
-app.use('/', signupUser);
-app.use('/', authoriz, userRouter);
-app.use('/', authoriz, moviesRouter);
+// const options = {
+//   origin: [
+//     'http://localhost:3000',
+//     // 'https://api.boronin.nomoredomains.club',
+//     // 'http://api.boronin.nomoredomains.club',
+//     // 'https://api.boronin.nomoredomains.club',
+//     // 'http://api.boronin.nomoredomains.club',
+//   ],
+//   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+//   preflightContinue: false,
+//   optionsSuccessStatus: 204,
+//   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
+//   credentials: true,
+// };
+app.use(cors());
 
-app.use(() => {
-  throw new NotFoundError('Запрашиваемый ресурс не найден');
-});
 app.use(errorLogger);
 app.use(errors());
-app.use(centralErrors);
+app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`Приложение запущено на ${PORT} порту`);
 });

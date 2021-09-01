@@ -1,86 +1,85 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
-const User = require('../models/user');
-const NotFoundError = require('../errors/NotFoundError');
+const User = require('../models/users');
+
+const BadRequestError = require('../errors/BadRequestError');
 const ConflictError = require('../errors/ConflictError');
 const UnauthorizedError = require('../errors/UnauthorizedError');
 
-const { JWT_SECRET, NODE_ENV } = process.env;
+const {
+  BAD_REQUEST_ERROR_MSG,
+  WRONG_EMAIL_PASSWORD_MSG,
+  USER_ALREADY_EXIST_MSG,
+} = require('../utils/constants');
+
+const { NODE_ENV, JWT_SECRET } = require('../config');
+
+module.exports.getCurrentUser = (req, res, next) => {
+  User.findById(req.user._id)
+    .then((user) => res.status(200).send(user))
+    .catch(next);
+};
+
+module.exports.createUser = (req, res, next) => {
+  const {
+    name, email, password,
+  } = req.body;
+  bcrypt.hash(password, 10)
+    .then((hash) => User.create({
+      name,
+      email,
+      password: hash,
+    }))
+    .then((user) => res.status(200).send({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+    }))
+    .catch((err) => {
+      if (err.name === 'MongoError' || err.code === 11000) {
+        throw new ConflictError(USER_ALREADY_EXIST_MSG);
+      }
+      if (err.name === 'ValidationError') {
+        throw new BadRequestError(`${BAD_REQUEST_ERROR_MSG}: ${err.message}`);
+      } else {
+        next(err);
+      }
+    })
+    .catch(next);
+};
+
+module.exports.patchUser = (req, res, next) => {
+  const { name, email } = req.body;
+  User.findByIdAndUpdate(
+    req.user._id,
+    { name, email },
+    { new: true, runValidation: true },
+  )
+    .then((user) => res.status(200).send(user))
+    .catch((err) => {
+      if (err.name === 'ValidationError') {
+        throw new BadRequestError(`${BAD_REQUEST_ERROR_MSG}: ${err.message}`);
+      } else if (err.name === 'MongoError' && err.code === 11000) {
+        throw new ConflictError(USER_ALREADY_EXIST_MSG);
+      } else {
+        next(err);
+      }
+    })
+    .catch(next);
+};
 
 module.exports.login = (req, res, next) => {
   const { email, password } = req.body;
-  User.findOne({ email })
-    .select('+password')
+  return User.findUserByCredentials(email, password)
     .then((user) => {
-      if (!user) {
-        throw new UnauthorizedError('Неправильные почта или пароль'); // 401
-      }
-      return bcrypt.compare(password, user.password).then((matched) => {
-        if (!matched) {
-          throw new UnauthorizedError('Неправильные почта или пароль'); // 401
-        }
-        const token = jwt.sign(
-          { _id: user._id },
-          NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret',
-          { expiresIn: '7d' },
-        );
-        return res.send({ token });
-      });
+      const token = jwt.sign({ _id: user._id },
+        NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret',
+        { expiresIn: '7d' });
+      res.status(200).send({ token });
     })
-    .catch(next);
-};
-
-module.exports.createProfile = (req, res, next) => {
-  const { email, password, name } = req.body;
-
-  User.findOne({ email })
-    .then((data) => {
-      if (data && data.email === email) {
-        throw new ConflictError('Пользователь с таким Email существует'); // 409
-      }
-      bcrypt
-        .hash(password, 10)
-        .then((hash) => {
-          User.create({
-            email,
-            password: hash,
-            name,
-          })
-            .then((user) => {
-              res.send(user);
-            })
-            .catch(next);
-        })
-        .catch(next);
-    })
-    .catch(next);
-};
-
-module.exports.getProfileInfo = (req, res, next) => {
-  const currentUserId = mongoose.Types.ObjectId(req.user._id);
-  User.findById(currentUserId)
-    .then((user) => {
-      if (!user) {
-        throw new NotFoundError('Пользователя не существует'); // 404
-      }
-      return res.send(user);
-    })
-    .catch(next);
-};
-
-module.exports.updateProfile = (req, res, next) => {
-  const { email, name } = req.body;
-  const userId = req.user._id;
-
-  User.findOne({ email })
-    .then((data) => {
-      if (data && data.email === email) {
-        throw new ConflictError('Пользователь с таким Email существует'); // 409
-      }
-      User.findByIdAndUpdate({ _id: userId }, { email, name }, { new: true })
-        .then((user) => res.send(user))
-        .catch(next);
+    // eslint-disable-next-line no-unused-vars
+    .catch((err) => {
+      throw new UnauthorizedError(WRONG_EMAIL_PASSWORD_MSG);
     })
     .catch(next);
 };
