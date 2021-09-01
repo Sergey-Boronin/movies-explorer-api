@@ -45,7 +45,7 @@ app.use(indexRouter);
 //   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
 //   credentials: true,
 // };
-app.use(cors());
+app.use('*', cors());
 
 app.use(errorLogger);
 app.use(errors());
