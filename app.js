@@ -31,21 +31,21 @@ app.use(express.urlencoded({ extended: true }));
 app.disable('x-powered-by');
 app.use(indexRouter);
 
-// const options = {
-//   origin: [
-//     'http://localhost:3000',
-//     // 'https://api.boronin.nomoredomains.club',
-//     // 'http://api.boronin.nomoredomains.club',
-//     // 'https://api.boronin.nomoredomains.club',
-//     // 'http://api.boronin.nomoredomains.club',
-//   ],
-//   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-//   preflightContinue: false,
-//   optionsSuccessStatus: 204,
-//   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
-//   credentials: true,
-// };
-app.use('*', cors());
+const options = {
+  origin: [
+    'http://localhost:3000',
+    // 'https://api.boronin.nomoredomains.club',
+    // 'http://api.boronin.nomoredomains.club',
+    // 'https://api.boronin.nomoredomains.club',
+    // 'http://api.boronin.nomoredomains.club',
+  ],
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
+  credentials: true,
+};
+app.use('*', cors(options));
 
 app.use(errorLogger);
 app.use(errors());
