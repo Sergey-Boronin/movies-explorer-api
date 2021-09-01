@@ -1,13 +1,41 @@
-# Бэкенд по дипломной работе курса веб-разработка. movies-explorer-api .
-## Выполнил студент Яндекс.Практикума Бережнов Тимофей
+# Movies Explorer API
+## Ссылки
+- IP-адрес сервера: 178.154.196.18
+- Домен: https://movies-explorer-borodulex.nomoredomains.club/api
 
-### Обзор
+## О проекте
 
-Это бэкенд по дипломной работе проекта movies-explorer . Выполнен на express.js .
+Бэкенд часть дипломного проекта студента факультета Веб-разработки Яндекс.Практикума.
 
-При работе на локальном сервере устанавливать порт 3005 вместо 3000
+## Использованные языки, технологии и методологии
+### Бэкенд
+- REST API
+- Node.js
+- Express.js
+  - Module routers
+  - Middlewares
+- Nodemon
+- MongoDB (NoSQL)
+- Mongoose (Object Document Mapper)
+- Centralized error handler
+- Joi and Celebrate validation
+- Winston request and response logger
+- Helmet
+- Express-rate-limit
+- Postman
 
-`npm run start` — запускает сервер   
-`npm run dev` — запускает сервер с hot-reload
+### Инфраструктура
+- Git
+- Editorconfig
+- ESLint
+- Airbnb JavaScript Style Guide (eslint-config-airbnb-base)
 
-* [Ссылка на сервер](https://api.diplom.timofeus91.nomoredomains.club/)
+
+## Как использовать
+### Запуск сборки
+1. Клонируйте репозиторий
+2. В папке проекта выполните `npm i` и одну из команд:
+  - Запуск в режиме разработки (с hotreload): `npm run dev`;
+  - Запуск в продакшн-режиме (без hotreload): `npm run start`.
+3. Все, вы великолепны :) В случае успеха в терминале будет сообщение: "App listening on port \*номер порта\*"
+

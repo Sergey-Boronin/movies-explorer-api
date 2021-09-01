@@ -1,75 +1,80 @@
 const Movie = require('../models/movie');
 
-const NoFoundError = require('../errors/NoFoundError');
-const ValidationError = require('../errors/ValidationError');
-const AccessError = require('../errors/AccessError');
-const {
-  NoFoundErrorMessage,
-  ValidationErrorMessage,
-  AccessErrorMessage,
-} = require('../utils/const');
+const { CREATED } = require('../utils/consts');
+const { parseValidationErrors } = require('../utils/utils');
 
-module.exports.getMovies = (req, res, next) => {
-  Movie.find({ owner: req.user._id })
-    .then((movies) => res.send(movies))
-    .catch((err) => next(err));
-};
+const BadRequestError = require('../errors/bad-request-err');
+const NotFoundError = require('../errors/not-found-err');
+const ForbiddenError = require('../errors/forbidden-err');
 
-module.exports.createMovie = (req, res, next) => {
-  const {
-    country,
-    director,
-    duration,
-    year,
-    description,
-    image,
-    trailer,
-    thumbnail,
-    movieId,
-    nameRU,
-    nameEN,
-  } = req.body;
+module.exports = {
+  find(req, res, next) {
+    Movie.find({ owner: req.user._id })
+      .populate('owner')
+      .then((movies) => res.send(movies))
+      .catch((error) => {
+        if (error.name === 'CastError') {
+          return next(new BadRequestError('Ошибка приведения значения к ObjectId. Проверьте валидность передаваемого id.'));
+        }
+        return next(error);
+      });
+  },
+  create(req, res, next) {
+    const {
+      country,
+      director,
+      duration,
+      year,
+      description,
+      image,
+      trailer,
+      thumbnail,
+      movieId,
+      nameRU,
+      nameEN,
+    } = req.body;
+    const owner = req.user._id;
 
-  Movie.create({
-    owner: req.user._id,
-    country,
-    director,
-    duration,
-    year,
-    description,
-    image,
-    trailer,
-    thumbnail,
-    movieId,
-    nameRU,
-    nameEN,
-  })
-    .then((movie) => res.send(movie))
-    .catch((err) => {
-      if (err.name === 'ValidationError') {
-        throw new ValidationError(ValidationErrorMessage);
-      }
+    Movie.create({
+      country,
+      director,
+      duration,
+      year,
+      description,
+      image,
+      trailer,
+      thumbnail,
+      owner,
+      movieId,
+      nameRU,
+      nameEN,
     })
-    .catch(next);
-};
+      .then((movie) => movie.populate('owner').execPopulate())
+      .then(((movie) => res.status(CREATED).send(movie)))
+      .catch((error) => {
+        if (error.name === 'ValidationError') {
+          return next(new BadRequestError(`Ошибка валидации данных movie: ${parseValidationErrors(error)}.`));
+        }
+        return next(error);
+      });
+  },
+  remove(req, res, next) {
+    const { movieId } = req.params;
 
-module.exports.deleteMovie = (req, res, next) => {
-  Movie.findById(req.params.movieId)
-    .then((movie) => {
-      if (!movie) {
-        throw new NoFoundError(NoFoundErrorMessage);
-      } else if (movie.owner.toString() !== req.user._id) {
-        throw new AccessError(AccessErrorMessage);
-      }
-
-      Movie.findByIdAndDelete(req.params.movieId)
-        .then((movie) => res.send(movie))
-        .catch((err) => {
-          if (err.name === 'CastError') {
-            throw new ValidationError(ValidationErrorMessage);
-          }
-        })
-        .catch(next);
-    })
-    .catch(next);
+    Movie.findById(movieId)
+      .orFail(() => new NotFoundError('Фильм не найден.'))
+      .then((movie) => {
+        if (String(movie.owner) !== req.user._id) {
+          throw new ForbiddenError('Невозможно удалить чужой фильм.');
+        }
+        return Movie.findByIdAndRemove(movieId)
+          .then(() => res.send({ message: 'Фильм удален.' }));
+      })
+      .catch((error) => {
+        if (error.name === 'CastError') {
+          next(new BadRequestError('Ошибка приведения значения к ObjectId. Проверьте валидность передаваемого id.'));
+        }
+        next(error);
+      });
+  },
 };

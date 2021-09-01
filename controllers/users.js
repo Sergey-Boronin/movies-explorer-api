@@ -1,111 +1,117 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const NoUserFoundError = require('../errors/NoFoundError');
-const AuthorizationError = require('../errors/AuthorizationError');
-const ValidationError = require('../errors/ValidationError');
-const ConflictError = require('../errors/ConflictError');
-const {
-  NoUserFoundErrorMessage,
-  AuthorizationErrorMessage,
-  ValidationErrorMessage,
-  ConflictErrorMessage,
-} = require('../utils/const');
 
-const { NODE_ENV, JWT_SECRET } = process.env;
+const { CREATED } = require('../utils/consts');
+const { parseValidationErrors } = require('../utils/utils');
 
-module.exports.getUserMe = (req, res, next) => {
-  User.findById(req.user._id)
-    .orFail(new Error('NotFound'))
-    .then((user) => res.send(user))
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        throw new ValidationError(ValidationErrorMessage);
-      } else if (err.message === 'NotFound') {
-        throw new NoUserFoundError(NoUserFoundErrorMessage);
-      }
-    })
-    .catch(next);
+const NotFoundError = require('../errors/not-found-err');
+const BadRequestError = require('../errors/bad-request-err');
+const ConflictError = require('../errors/conflict-err');
+const { JWT_SECRET } = require('../config');
+
+const generateCookie = (res, user) => {
+  const token = jwt.sign(
+    { _id: user._id },
+    JWT_SECRET,
+    { expiresIn: '7d' },
+  );
+
+  return res.cookie('token', token, {
+    maxAge: 3600000 * 24 * 7,
+    httpOnly: true,
+    sameSite: true,
+  });
 };
 
-module.exports.createUser = (req, res, next) => {
-  const {
-    name, email, password,
-  } = req.body;
-
-  bcrypt.hash(password, 10)
-    .then((hash) => User.create({
-      name,
+module.exports = {
+  createUser(req, res, next) {
+    const {
       email,
-      password: hash,
-    }))
-    .then((user) => res.send({
-      name: user.name,
-      email: user.email,
-    }))
-    .catch((err) => {
-      if (err.name === 'ValidationError') {
-        throw new ValidationError(ValidationErrorMessage);
-      } else if (err.name === 'MongoError' && err.code === 11000) {
-        throw new ConflictError(ConflictErrorMessage);
-      }
-    })
-    .catch(next);
-};
+      password,
+      name,
+    } = req.body;
 
-module.exports.updateInfo = (req, res, next) => {
-  const { name, email } = req.body;
+    bcrypt.hash(password, 10)
+      .then((hash) => User.create({
+        email,
+        password: hash,
+        name,
+      }))
+      .then((createdUser) => {
+        generateCookie(res, createdUser);
 
-  User.findByIdAndUpdate(req.user._id, { name, email }, { runValidators: true, new: true })
-    .then((user) => {
-      if (!user) {
-        throw new NoUserFoundError(NoUserFoundErrorMessage);
-      } else {
-        res.send(user);
-      }
-    })
-    .catch((err) => {
-      if (err.name === 'ValidationError') {
-        throw new ValidationError(ValidationErrorMessage);
-      } else if (err.name === 'CastError') {
-        throw new ValidationError(ValidationErrorMessage);
-      } else if (err.name === 'MongoError' && err.code === 11000) {
-        throw new ConflictError(ConflictErrorMessage);
-      }
-    })
-    .catch(next);
-};
-
-module.exports.login = (req, res, next) => {
-  const { email, password } = req.body;
-
-  User.findOne({ email }).select('+password')
-    .then((user) => {
-      if (!user) {
-        return Promise.reject(new Error(AuthorizationErrorMessage));
-      }
-
-      // пользователь найден
-      return bcrypt.compare(password, user.password).then((matched) => {
-        if (!matched) {
-          // хеши не совпали — отклоняем промис
-          return Promise.reject(new Error(AuthorizationErrorMessage));
+        res.status(CREATED).send({
+          name: createdUser.name,
+          email: createdUser.email,
+        });
+      })
+      .catch((error) => {
+        if (error.name === 'MongoError' && error.code === 11000) {
+          return next(new ConflictError('Пользователь с таким email уже зарегистрирован.'));
         }
-        return user;
+        if (error.name === 'ValidationError') {
+          return next(new BadRequestError(`Ошибка валидации данных user: ${parseValidationErrors(error)}.`));
+        }
+        return next(error);
       });
-    })
-    // аутентификация успешна
-    .then((user) => {
-      const token = jwt.sign(
-        { _id: user._id },
-        NODE_ENV === 'production' ? JWT_SECRET : 'super-strong-secret',
-        { expiresIn: '7d' },
-      );
+  },
+  signin(req, res, next) {
+    const {
+      email,
+      password,
+    } = req.body;
 
-      res.send({ token });
-    })
-    .catch((err) => {
-      throw new AuthorizationError(AuthorizationErrorMessage);
-    })
-    .catch(next);
+    User.findUserByCredentials(email, password)
+      .then((user) => {
+        generateCookie(res, user);
+
+        return res.send({ messsage: 'Все верно!' });
+      })
+      .catch((error) => {
+        if (error.name === 'ValidationError') {
+          return next(new BadRequestError(`Ошибка валидации данных user: ${parseValidationErrors(error)}.`));
+        }
+        return next(error);
+      });
+  },
+  signout(req, res) {
+    res.clearCookie('token');
+    return res.send({ message: 'Успешный выход из системы.' });
+  },
+  getBio(req, res, next) {
+    User.findById(req.user._id)
+      .orFail(() => new NotFoundError('Запрашиваемый пользователь не найден.'))
+      .then((user) => res.send(user))
+      .catch((error) => {
+        if (error.name === 'CastError') {
+          return next(new BadRequestError('Ошибка приведения значения к ObjectId. Проверьте валидность передаваемого id.'));
+        }
+        return next(error);
+      });
+  },
+  updateBio(req, res, next) {
+    User.findByIdAndUpdate(
+      req.user._id,
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+      },
+    )
+      .orFail(() => new NotFoundError('Запрашиваемый пользователь не найден.'))
+      .then((user) => res.send(user))
+      .catch((error) => {
+        if (error.name === 'MongoError' && error.code === 11000) {
+          return next(new ConflictError('Пользователь с таким email уже зарегистрирован.'));
+        }
+        if (error.name === 'CastError') {
+          return next(new BadRequestError('Ошибка приведения значения к ObjectId. Проверьте валидность передаваемого id.'));
+        }
+        if (error.name === 'ValidationError') {
+          return next(new BadRequestError(`Ошибка валидации данных movie: ${parseValidationErrors(error)}.`));
+        }
+        return next(error);
+      });
+  },
 };
