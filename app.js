@@ -31,7 +31,7 @@ const options = {
     'http://boronin-diploma.nomoredomains.club',
   ],
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-  preflightContinue: true,
+  preflightContinue: false,
   optionsSuccessStatus: 204,
   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
   credentials: true,
@@ -55,7 +55,7 @@ app.get('/crash-test', () => {
 app.use(router);
 
 app.use('*', (req, res, next) => {
-  const err = new NotFoundError('Запрашиваемый ресурс не найден');
+  const err = new NotFoundError('Запрашиваемый ресурс не найден!');
   next(err);
 });
 
