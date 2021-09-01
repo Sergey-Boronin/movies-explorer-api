@@ -1,41 +1,79 @@
+require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
-const cookieParser = require('cookie-parser');
-const { errors } = require('celebrate');
-const helmet = require('helmet');
 const cors = require('cors');
-
-const { MONGO_DB_PATH, PORT } = require('./config');
-
+const mongoose = require('mongoose');
+const helmet = require('helmet');
+const bodyParser = require('body-parser');
+const { errors } = require('celebrate');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const { limiter } = require('./middlewares/limiter');
+const router = require('./routes/index');
+const NotFoundError = require('./errors/NotFoundError');
 const { requestLogger, errorLogger } = require('./middlewares/logger');
-const limiter = require('./middlewares/limiter');
-const indexRouter = require('./routes/index');
-const errorHandler = require('./middlewares/errorHandler');
 
+const { PORT = 3000 } = process.env;
 const app = express();
 
-mongoose.connect(MONGO_DB_PATH, {
+mongoose.connect('mongodb://localhost:27017/mestodb', {
   useNewUrlParser: true,
   useCreateIndex: true,
   useFindAndModify: false,
   useUnifiedTopology: true,
 });
 
-app.use(requestLogger);
+const options = {
+  origin: [
+    'http://localhost:3000',
+    'https://api.boronin.nomoredomains.club',
+    'http://api.boronin.nomoredomains.club',
+    'https://boronin-diploma.nomoredomains.club',
+    'http://boronin-diploma.nomoredomains.club',
+  ],
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
+  credentials: true,
+};
+app.use('*', cors(options));
+
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(limiter);
-app.use(helmet());
-app.use(cors());
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.disable('x-powered-by');
-app.use(indexRouter);
+app.use(helmet());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(requestLogger);
+
+app.get('/crash-test', () => {
+  setTimeout(() => {
+    throw new Error('Сервер сейчас упадёт');
+  }, 0);
+});
+
+app.use(router);
+
+app.use('*', (req, res, next) => {
+  const err = new NotFoundError('Запрашиваемый ресурс не найден');
+  next(err);
+});
 
 app.use(errorLogger);
+
 app.use(errors());
-app.use(errorHandler);
+
+app.use((err, req, res, next) => {
+  const { statusCode = 500, message } = err;
+  res.status(statusCode).send({
+    message: statusCode === 500 ? 'На сервере произошла ошибка' : message,
+  });
+  next();
+});
+
+app.disable('x-powered-by');
 
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
-  console.log(`Приложение запущено на ${PORT} порту`);
+  console.log('сервер запущен');
 });
