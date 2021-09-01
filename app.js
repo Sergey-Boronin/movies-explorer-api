@@ -47,7 +47,7 @@ app.use(indexRouter);
 // };
 // app.use('*', cors(options));
 
-app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
+app.use(cors({ credentials: true, origin: 'http://localhost:3000/' }));
 
 app.use(errorLogger);
 app.use(errors());
