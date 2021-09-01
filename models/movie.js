@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const validator = require('validator');
 
 const movieSchema = new mongoose.Schema({
   country: {
@@ -23,15 +24,21 @@ const movieSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    required: true,
+    validate: {
+      validator: (v) => validator.isURL(v),
+    },
   },
   trailer: {
     type: String,
-    required: true,
+    validate: {
+      validator: (v) => validator.isURL(v),
+    },
   },
   thumbnail: {
     type: String,
-    required: true,
+    validate: {
+      validator: (v) => validator.isURL(v),
+    },
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
@@ -39,17 +46,23 @@ const movieSchema = new mongoose.Schema({
     required: true,
   },
   movieId: {
-    type: Number,
-    required: true,
+    type: String,
+    require: true,
   },
   nameRU: {
     type: String,
-    required: true,
+    require: true,
   },
   nameEN: {
     type: String,
-    required: true,
+    require: true,
+  },
+  likes: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
+    default: [],
   },
 });
+
+movieSchema.index({ owner: 1, movieId: 1 }, { unique: true });
 
 module.exports = mongoose.model('movie', movieSchema);
