@@ -31,7 +31,7 @@ const options = {
     'http://boronin-diploma.nomoredomains.club',
   ],
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-  preflightContinue: false,
+  preflightContinue: true,
   optionsSuccessStatus: 204,
   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
   credentials: true,
