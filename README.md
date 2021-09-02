@@ -1,4 +1,4 @@
 # movies-explorer-api
 
-### url - api.boronin.nomoredomains.club
-### ip - 178.154.253.235
+domen-name: http://api.oladuwki-movies.nomoredomains.rocks
+open IPv4: 84.201.187.54
