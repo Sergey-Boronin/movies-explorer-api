@@ -1,12 +1,29 @@
 const router = require('express').Router();
+const { celebrate, Joi } = require('celebrate');
 const userRouter = require('./users');
 const movieRouter = require('./movies');
-const NotFoundError = require('../errors/not-found-error');
+const auth = require('../middlewares/auth');
+const { createUser, login } = require('../controllers/users');
 
-router.use('/users', userRouter);
-router.use('/movies', movieRouter);
-router.use((req, res, next) => {
-  next(new NotFoundError('Ресурс по указанному адресу не найден'));
+const validateUserSignup = celebrate({
+  body: Joi.object().keys({
+    email: Joi.string().required().email(),
+    password: Joi.string().required().min(8),
+    name: Joi.string().min(2).max(30),
+  }),
 });
+
+const validateSignin = celebrate({
+  body: Joi.object().keys({
+    email: Joi.string().required().email(),
+    password: Joi.string().required().min(8),
+  }),
+});
+
+router.post('/signup', validateUserSignup, createUser);
+router.post('/signin', validateSignin, login);
+
+router.use('/users', auth, userRouter);
+router.use('/movies', auth, movieRouter);
 
 module.exports = router;

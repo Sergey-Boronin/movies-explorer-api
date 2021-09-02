@@ -1,32 +1,34 @@
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+const NotFoundError = require('../errors/NotFoundError');
+const BadRequestError = require('../errors/BadRequestError');
+const ConflictError = require('../errors/ConflictError');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
-const User = require('../models/user');
-const BadRequestError = require('../errors/bad-request-error');
-const AuthorizationError = require('../errors/authorization-error');
-const NotFoundError = require('../errors/not-found-error');
-const AlreadyExistsError = require('../errors/already-exists-error');
-const ServerError = require('../errors/server-error');
 
-const login = (req, res, next) => {
-  const {
-    email,
-    password,
-  } = req.body;
+const errorHandle = (err, next) => {
+  if (err.name === 'ValidationError') {
+    throw new BadRequestError('Ошибка обработки запроса');
+  } if (err.name === 'CastError') {
+    throw new BadRequestError('Ошибка обработки запроса');
+  } if (err.name === 'MongoError' && err.code === 11000) {
+    throw new ConflictError('Адрес электронной почты уже используется');
+  }
+  next(err);
+};
 
-  return User.findUserByCredentials(email, password)
+const getUserMe = (req, res, next) => {
+  User.findById(req.user._id)
     .then((user) => {
-      res.send({
-        token: jwt.sign(
-          { _id: user._id },
-          NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret-key',
-          { expiresIn: '7d' },
-        ),
-      });
+      if (!user) {
+        throw new NotFoundError('Запрашиваемый ресурс не найден');
+      }
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.send(user);
     })
-    .catch(() => {
-      next(new AuthorizationError('Неверный пользователь или пароль'));
+    .catch((err) => {
+      errorHandle(err, next);
     });
 };
 
@@ -36,70 +38,55 @@ const createUser = (req, res, next) => {
     password,
     name,
   } = req.body;
-
   bcrypt.hash(password, 10)
-    .then((hash) => User.create(
-      {
-        email,
-        password: hash,
-        name,
-      },
-    ))
-    .then((user) => res.status(201).send({ user: user.toJSON() }))
+    .then((hash) => User.create({
+      email,
+      password: hash,
+      name,
+    }))
+    .then((user) => res.send({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+    }))
     .catch((err) => {
-      if (err.name === 'ValidationError') {
-        next(new BadRequestError(`${Object.values(err.errors).map((error) => error.message).join(', ')}`));
-      } else if (err.name === 'MongoError' && err.code === 11000) {
-        next(new AlreadyExistsError('Пользователь с таким email уже существует'));
-      } else {
-        next(new ServerError('Произошла ошибка'));
-      }
+      errorHandle(err, next);
     });
 };
 
-const getUser = (req, res, next) => {
-  const myId = req.user._id;
-  User.findById(myId)
-    .then((user) => res.send(user))
+const login = (req, res, next) => {
+  const { email, password } = req.body;
+  return User.findUserByCredentials(email, password)
+    .then((user) => {
+      const token = jwt.sign(
+        { _id: user._id },
+        NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret',
+        { expiresIn: '7d' },
+      );
+      res.send({ token });
+    })
     .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new BadRequestError('Переданы некорректные данные при создании пользователя'));
-      } else {
-        next(new ServerError('Произошла ошибка'));
-      }
+      errorHandle(err, next);
     });
 };
 
 const updateUser = (req, res, next) => {
-  User.findByIdAndUpdate(
-    req.user._id,
-    {
-      name: req.body.name,
-      email: req.body.email,
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  )
-    .orFail(() => {
-      throw new NotFoundError('Пользователь по указанному id не найден ');
-    })
-    .then((user) => res.send(user))
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new BadRequestError('Переданы некорректные данные при обновлении профиля'));
-      } else if (err.statusCode === 404) {
-        next(new NotFoundError('Пользователь по указанному id не найден'));
-      } else {
-        next(new ServerError('Произошла ошибка'));
+  const { name, email } = req.body;
+  User.findByIdAndUpdate(req.user._id, { name, email }, { new: true })
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Запрашиваемый ресурс не найден');
       }
+      return res.send(user);
+    })
+    .catch((err) => {
+      errorHandle(err, next);
     });
 };
 
 module.exports = {
-  login,
   createUser,
-  getUser,
   updateUser,
+  login,
+  getUserMe,
 };

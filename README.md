@@ -1,5 +1,4 @@
-# Проект: Movies Explorer
-IP сервера 178.154.253.235
-Backend https://api.boronin-diploma.nomoredomains.club
+# movies-explorer-api
 
-
+domen-name: https://boronin-diploma.nomoredomains.club
+open IPv4: 178.154.253.235
