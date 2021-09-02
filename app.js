@@ -47,7 +47,6 @@ app.use(indexRouter);
 //   credentials: true,
 // };
 
-
 app.use(errorLogger);
 app.use(errors());
 app.use(errorHandler);
