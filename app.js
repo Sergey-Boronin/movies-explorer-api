@@ -1,9 +1,9 @@
+const cors = require('cors');
 const express = require('express');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const { errors } = require('celebrate');
 const helmet = require('helmet');
-const cors = require('cors');
 
 const { MONGO_DB_PATH, PORT } = require('./config');
 
@@ -13,6 +13,7 @@ const indexRouter = require('./routes/index');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
+app.use(cors());
 
 mongoose.connect(MONGO_DB_PATH, {
   useNewUrlParser: true,
@@ -31,21 +32,21 @@ app.use(express.urlencoded({ extended: true }));
 app.disable('x-powered-by');
 app.use(indexRouter);
 
-const options = {
-  origin: [
-    'http://localhost:3000',
-    // 'https://api.boronin.nomoredomains.club',
-    // 'http://api.boronin.nomoredomains.club',
-    // 'https://api.boronin.nomoredomains.club',
-    // 'http://api.boronin.nomoredomains.club',
-  ],
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
-  credentials: true,
-};
-app.use('*', cors(options));
+// const options = {
+//   origin: [
+//     'http://localhost:3000',
+//     // 'https://api.boronin.nomoredomains.club',
+//     // 'http://api.boronin.nomoredomains.club',
+//     // 'https://api.boronin.nomoredomains.club',
+//     // 'http://api.boronin.nomoredomains.club',
+//   ],
+//   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+//   preflightContinue: false,
+//   optionsSuccessStatus: 204,
+//   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
+//   credentials: true,
+// };
+
 
 app.use(errorLogger);
 app.use(errors());
