@@ -1,85 +1,54 @@
 const mongoose = require('mongoose');
-const validator = require('validator');
 
 const movieSchema = new mongoose.Schema({
   country: {
     type: String,
-    required: [true, 'Значение \'country\' обязательно'],
+    required: true,
   },
   director: {
     type: String,
-    required: [true, 'Значение \'director\' обязательно'],
+    required: true,
   },
   duration: {
     type: Number,
-    required: [true, 'Значение \'duration\' обязательно'],
+    required: true,
   },
   year: {
     type: String,
-    required: [true, 'Значение \'year\' обязательно'],
+    required: true,
   },
   description: {
     type: String,
-    required: [true, 'Значение \'description\' обязательно'],
+    required: true,
   },
   image: {
     type: String,
-    required: [true, 'Значение \'image\' обязательно'],
-    validate: {
-      validator(v) {
-        return validator.isURL(v);
-      },
-      message: 'Сбой валидатора для значения \'image\'. Ожидалась строка в формате URL, а получено \'{VALUE}\'',
-    },
+    required: true,
   },
   trailer: {
     type: String,
-    required: [true, 'Значение \'trailer\' обязательно'],
-    validate: {
-      validator(v) {
-        return validator.isURL(v);
-      },
-      message: 'Сбой валидатора для значения \'trailer\'. Ожидалась строка в формате URL, а получено \'{VALUE}\'',
-    },
+    required: true,
   },
   thumbnail: {
     type: String,
-    required: [true, 'Значение \'thumbnail\' обязательно'],
-    validate: {
-      validator(v) {
-        return validator.isURL(v);
-      },
-      message: 'Сбой валидатора для значения \'thumbnail\'. Ожидалась строка в формате URL, а получено \'{VALUE}\'',
-    },
+    required: true,
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
-    required: [true, 'Значение \'owner\' обязательно'],
-    validate: {
-      validator(v) {
-        return mongoose.Types.ObjectId.isValid(v);
-      },
-      message: 'Пользователя с Id \'{VALUE}\' не существует',
-    },
+    required: true,
   },
   movieId: {
     type: Number,
-    required: [true, 'Значение \'movieId\' обязательно'],
-    validate: {
-      validator(v) {
-        return validator.isInt(String(v));
-      },
-      message: 'Сбой валидатора для значения \'movieId\'. Ожидалось целое число, а получено \'{VALUE}\'',
-    },
+    required: true,
   },
   nameRU: {
     type: String,
-    required: [true, 'Значение \'nameRU\' обязательно'],
+    required: true,
   },
   nameEN: {
     type: String,
-    required: [true, 'Значение \'nameEN\' обязательно'],
+    required: true,
   },
 });
 
