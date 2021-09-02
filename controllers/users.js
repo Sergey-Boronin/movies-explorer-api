@@ -1,61 +1,86 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const NotFoundError = require('../errors/NotFoundError');
-const BadRequestError = require('../errors/BadRequestError');
-const ConflictError = require('../errors/ConflictError');
+const NotFoundError = require('../errors/not-found-error');
+const BadRequestError = require('../errors/bad-request-error');
+const ConflictError = require('../errors/conflict-error');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
-const errorHandle = (err, next) => {
-  if (err.name === 'ValidationError') {
-    throw new BadRequestError('Ошибка обработки запроса');
-  } if (err.name === 'CastError') {
-    throw new BadRequestError('Ошибка обработки запроса');
-  } if (err.name === 'MongoError' && err.code === 11000) {
-    throw new ConflictError('Адрес электронной почты уже используется');
-  }
-  next(err);
-};
-
-const getUserMe = (req, res, next) => {
-  User.findById(req.user._id)
+// ПОЛУЧИТЬ ТЕКУЩЕГО ПОЛЬЗОВАТЕЛЯ
+const getCurrentUser = (req, res, next) => {
+  const myId = req.user._id;
+  User.findById(myId)
     .then((user) => {
       if (!user) {
-        throw new NotFoundError('Запрашиваемый ресурс не найден');
+        throw new NotFoundError('Пользователь не найден');
       }
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.send(user);
+      return res.send(user);
     })
     .catch((err) => {
-      errorHandle(err, next);
+      if (err.kind === 'ObjectId') {
+        next(new BadRequestError('Невалидный id пользователя'));
+      } else {
+        next(err);
+      }
     });
 };
 
+// ОБНОВИТЬ ИНФОРМАЦИЮ О ПОЛЬЗОВАТЕЛЕ
+const updateUserInfo = (req, res, next) => {
+  const { email, name } = req.body;
+  User.findByIdAndUpdate(
+    req.user._id,
+    { email, name },
+    { new: true, runValidators: true },
+  )
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Пользователь не найден');
+      }
+      return res.send(user);
+    })
+    .catch((err) => {
+      if (err.name === 'ValidationError' || err.kind === 'ObjectId') {
+        next(new BadRequestError('Переданы некорректные данные'));
+      } else if (err.name === 'MongoError' || err.code === '11000') {
+        next(new ConflictError('Можно вносить изменения только со своего email'));
+      } else {
+        next(err);
+      }
+    });
+};
+
+// СОЗДАТЬ ПОЛЬЗОВАТЕЛЯ
 const createUser = (req, res, next) => {
-  const {
-    email,
-    password,
-    name,
-  } = req.body;
+  const { email, password, name } = req.body;
+
+  if (password.length === 0) {
+    throw new BadRequestError('Введите пароль');
+  }
+
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
-      email,
-      password: hash,
-      name,
+      email, password: hash, name,
     }))
-    .then((user) => res.send({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-    }))
+    .then((user) => {
+      res.status(201).send({ user: user.toJSON() });
+    })
     .catch((err) => {
-      errorHandle(err, next);
+      if (err.name === 'MongoError' && err.code === 11000) {
+        next(new ConflictError('Пользователь с данным e-mail уже существует'));
+      } else if (err.name === 'ValidationError') {
+        next(new BadRequestError('Передан неверный формат данных'));
+      } else {
+        next(err);
+      }
     });
 };
 
+// ЛОГИН
 const login = (req, res, next) => {
   const { email, password } = req.body;
+
   return User.findUserByCredentials(email, password)
     .then((user) => {
       const token = jwt.sign(
@@ -66,27 +91,13 @@ const login = (req, res, next) => {
       res.send({ token });
     })
     .catch((err) => {
-      errorHandle(err, next);
-    });
-};
-
-const updateUser = (req, res, next) => {
-  const { name, email } = req.body;
-  User.findByIdAndUpdate(req.user._id, { name, email }, { new: true })
-    .then((user) => {
-      if (!user) {
-        throw new NotFoundError('Запрашиваемый ресурс не найден');
-      }
-      return res.send(user);
-    })
-    .catch((err) => {
-      errorHandle(err, next);
+      next(err);
     });
 };
 
 module.exports = {
+  getCurrentUser,
+  updateUserInfo,
   createUser,
-  updateUser,
   login,
-  getUserMe,
 };

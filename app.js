@@ -1,50 +1,36 @@
 require('dotenv').config();
-const express = require('express');
 const cors = require('cors');
+const express = require('express');
 const mongoose = require('mongoose');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const { errors } = require('celebrate');
-const path = require('path');
-const cookieParser = require('cookie-parser');
-const { limiter } = require('./middlewares/limiter');
-const router = require('./routes/index');
-const NotFoundError = require('./errors/NotFoundError');
+// const limiter = require('./config/rate-limiter');
 const { requestLogger, errorLogger } = require('./middlewares/logger');
+const router = require('./routes/index');
+const errorHandler = require('./middlewares/error-handler');
 
-const { PORT = 3000 } = process.env;
 const app = express();
+const { PORT = 3000 } = process.env;
+const { NODE_ENV, MONGO_URL } = process.env;
 
-mongoose.connect('mongodb://localhost:27017/mestodb', {
+mongoose.connect(NODE_ENV === 'production' ? MONGO_URL : 'mongodb://localhost:27017/bitfilmsdb', {
   useNewUrlParser: true,
   useCreateIndex: true,
   useFindAndModify: false,
-  useUnifiedTopology: true,
+  autoIndex: true,
 });
 
-const options = {
-  origin: [
-    'http://localhost:3000',
-    // 'https://api.oladuwki-movies.nomoredomains.rocks',
-    // 'http://api.oladuwki-movies.nomoredomains.rocks',
-    // 'https://oladuwki-movies.nomoredomains.monster',
-    // 'http://oladuwki-movies.nomoredomains.monster',
-  ],
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
-  credentials: true,
-};
-app.use('*', cors(options));
-
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(limiter);
-app.use(cookieParser());
-app.use(helmet());
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
 app.use(requestLogger);
+
+app.use(cors());
+
+// app.use(limiter);
+
+app.use(helmet());
 
 app.get('/crash-test', () => {
   setTimeout(() => {
@@ -54,26 +40,12 @@ app.get('/crash-test', () => {
 
 app.use(router);
 
-app.use('*', (req, res, next) => {
-  const err = new NotFoundError('Запрашиваемый ресурс не найден');
-  next(err);
-});
-
 app.use(errorLogger);
 
 app.use(errors());
 
-app.use((err, req, res, next) => {
-  const { statusCode = 500, message } = err;
-  res.status(statusCode).send({
-    message: statusCode === 500 ? 'На сервере произошла ошибка' : message,
-  });
-  next();
-});
-
-app.disable('x-powered-by');
+app.use(errorHandler);
 
 app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log('сервер запущен');
+  console.log(`App listening on port ${PORT}`);
 });
