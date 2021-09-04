@@ -12,7 +12,7 @@ const router = require('./routes/index');
 const NotFoundError = require('./errors/NotFoundError');
 const { requestLogger, errorLogger } = require('./middlewares/logger');
 
-const { PORT = 3005 } = process.env;
+const { PORT = 3000 } = process.env;
 const app = express();
 
 mongoose.connect('mongodb://localhost:27017/mestodb', {
@@ -22,20 +22,7 @@ mongoose.connect('mongodb://localhost:27017/mestodb', {
   useUnifiedTopology: true,
 });
 
-// const options = {
-//   origin: [
-//     'http://localhost:3000',
-//     'https://api.oladuwki-movies.nomoredomains.rocks',
-//     'http://api.oladuwki-movies.nomoredomains.rocks',
-//     'https://oladuwki-movies.nomoredomains.monster',
-//     'http://oladuwki-movies.nomoredomains.monster',
-//   ],
-//   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-//   preflightContinue: false,
-//   optionsSuccessStatus: 204,
-//   allowedHeaders: ['Content-Type', 'Origin', 'Authorization'],
-//   credentials: true,
-// };
+
 app.use(cors());
 
 app.use(express.static(path.join(__dirname, 'public')));
